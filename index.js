@@ -48,7 +48,10 @@ app.post('/', (req, res) => {
   // A map of intent names to callback functions.
   // The "HelloWorld" is an example only -- you may delete it.
   const intentMap = {
-    "HelloWorld": doHelloWorld
+    "HelloWorld": doHelloWorld,
+    "Number of Users": doNumUsers,
+    "Number of Posts": doNumPosts,
+    "Get Posts": doGetPosts,
   }
 
   if (intent in intentMap) {
@@ -78,10 +81,99 @@ async function doHelloWorld(req, res) {
       {
         text: {
           text: [
-            'You will see this if you trigger an intent named HelloWorld'
+            `I didn't get that. Do you want to get a number of users or posts?`
           ]
         }
       }
     ]
   })
+}
+
+async function doNumUsers(req, res) {
+  const resp = await fetch('https://www.cs571.org/s23/hw12/api/numUsers', { headers: { "X-CS571-ID": "bid_c49825b5bd469d794555" } });
+  const num = await resp.json();
+
+  res.status(200).send({
+    fulfillmentMessages: [
+      {
+        text: {
+          text: [
+            `There are ${num.users} users registered on BadgerChat!`
+          ]
+        }
+      }
+    ]
+  })
+}
+
+async function doNumPosts(req, res) {
+  const params = req.body.queryResult.parameters;
+  let result = "";
+  if (params.chatroom) {
+    const resp = await fetch(`https://www.cs571.org/s23/hw12/api/chatroom/${params.chatroom}/numMessages`, { headers: { "X-CS571-ID": "bid_c49825b5bd469d794555" } });
+    const num = await resp.json();
+    result = `There are ${num.messages} messages in ${params.chatroom}!`;
+  } else {
+    const resp = await fetch('https://www.cs571.org/s23/hw12/api/numMessages', { headers: { "X-CS571-ID": "bid_c49825b5bd469d794555" } });
+    const num = await resp.json();
+    result = `There are ${num.messages} messages on BadgerChat!`;
+  }
+
+
+  res.status(200).send({
+    fulfillmentMessages: [
+      {
+        text: {
+          text: [
+            result
+          ]
+        }
+      }
+    ]
+  })
+}
+
+async function doGetPosts(req, res) {
+  const params = req.body.queryResult.parameters;
+  const resp = await fetch(`https://www.cs571.org/s23/hw12/api/chatroom/${params.chatroom}/messages`, { headers: { "X-CS571-ID": "bid_c49825b5bd469d794555" } });
+  const message = await resp.json();
+  const cards = [];
+  let num = 1;
+  if (params.number) {
+    if (params.number <= 5) {
+      num = params.number;
+    }
+    else if (params.number > 5) {
+      num = 5;
+    }
+  }
+
+  cards.push({
+    text: {
+      text: [
+        `Here are the latest ${num} messages from ${params.chatroom}!`
+      ]
+    }
+  })
+  for (let i = 0; i < num; i++) {
+    cards.push({
+      card: {
+        title: `${message.messages[i].title}`,
+        subtitle: `${message.messages[i].content}`,
+        buttons: [
+          {
+            text: "READ MORE",
+            postback: `https://cs571.org/s23/badgerchat/chatrooms/${params.chatroom}/messages/${message.messages[i].id}`
+          }
+        ]
+      }
+    })
+  }
+
+
+  console.log(message.messages[0].title);
+  res.status(200).send({
+    fulfillmentMessages: cards
+  })
+
 }
